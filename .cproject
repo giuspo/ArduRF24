@@ -21,9 +21,7 @@
 								<option id="it.baeyens.arduino.compiler.cpp.sketch.option.incpath.2012419082" name="Include Paths (-I)" superClass="it.baeyens.arduino.compiler.cpp.sketch.option.incpath" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/arduino/core}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/arduino/variant}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RadioHead}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RF24}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RF24/arch/${A.ARCHITECTURE}}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/SPI}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/Button}&quot;"/>
 								</option>
@@ -33,9 +31,7 @@
 								<option id="it.baeyens.arduino.compiler.c.sketch.option.incpath.1796692082" name="Include Paths (-I)" superClass="it.baeyens.arduino.compiler.c.sketch.option.incpath" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/arduino/core}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/arduino/variant}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RadioHead}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RF24}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/RF24/arch/${A.ARCHITECTURE}}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/SPI}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ArduRF24/Libraries/Button}&quot;"/>
 								</option>
