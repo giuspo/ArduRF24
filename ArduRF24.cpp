@@ -8,36 +8,37 @@
 #define BUTTON_PIN 4
 
 #define DEBOUNCE_MS 20
-#define OUT_BLINK_TIME_MS 250
-#define DELAY_BLINK_MS 1500
-
-typedef enum ETX_STATE
-{
-	BTN_PRESS_TX_ST,
-	SEND_TX_ST,
-};
+#define BLINK_BASE_TIMER_MS 50
+#define FAST_BLINK_CNT 2
+#define SLOW_BLINK_CNT 5
+#define BLINK_TOUT_MS 1500
+#define DEBUG_STR F("ArduRF24: ")
 
 typedef enum EBLINK_STATE
 {
 	INIT_BLINK_ST,
-	DELAY_BLINK_ST,
+	BLINK_ST,
 };
 
-//typedef enum ERX_STATE
-//{
-//	RECEIVE_ST
-//};
+typedef enum EBLINK_TYPE
+{
+	NO_BLINK,
+	SLOW_BLINK,
+	FAST_BLINK
+};
 
 // SG: NRF24 Hardware initialization (Pin 9 -> , Pin 10 ->)
 RF24 gNRF24(9,10);
 Button gtBtn(BUTTON_PIN, true, true, DEBOUNCE_MS);
 
-ETX_STATE gtTXState = BTN_PRESS_TX_ST;
 EBLINK_STATE gtBlinkState = INIT_BLINK_ST;
-// ERX_STATE gRXState = RECEIVE_ST;
+EBLINK_TYPE gtBlink = NO_BLINK;
 
-unsigned long ulBlinkOldTime;
-unsigned long ulActiveBlinkOldTime;
+unsigned long gulMillis;
+unsigned long gulStopBlinkOldTime;
+unsigned long gulBaseOldTime;
+int giBlinkCnt;
+int giMaxBlinkCnt;
 
 byte grgcAddress[][6] = {"1Node", "2Node"};
 byte gbyCounter = 1;
@@ -47,8 +48,6 @@ const byte gbyTOGGLE = 0xAA;
 // SG: false -> RX, true -> TX
 bool gbRadioType;
 bool gbOutState = false;
-bool gbFailBlink = false;
-bool gbOkBlink = false;
 
 void TX_FSM()
 {
@@ -56,48 +55,29 @@ void TX_FSM()
 
 	if(byBtn)
 	{
-		Serial.println(F("ArduRF24: Start sending"));
+		gNRF24.stopListening();
+
+		Serial.print(DEBUG_STR);
+		Serial.println(F("Start sending"));
 
 		bool bRet = gNRF24.write(&gbyTOGGLE, sizeof(gbyTOGGLE));
 
 		if(bRet)
 		{
-			Serial.println(F("ArduRF24: Sending ok"));
+			Serial.print(DEBUG_STR);
+			Serial.println(F("Sending ok"));
 
-			gbOkBlink = true;
+			gtBlink = FAST_BLINK;
 
 			return;
 		}
 
-		Serial.println(F("ArduRF24: Sending failure"));
+		Serial.print(DEBUG_STR);
+		Serial.println(F("Sending failure"));
 
-		gbFailBlink = true;
-	}
+		gtBlink = SLOW_BLINK;
 
-
-
-	switch(gtTXState)
-	{
-		case BTN_PRESS_TX_ST:
-		{
-
-		}
-		break;
-		case SEND_TX_ST:
-		{
-			bool bTXOk;
-			bool bFail;
-			bool bVar;
-
-			gNRF24.whatHappened(bTXOk, bFail, bVar);
-			if(bTXOk || bFail)
-			{
-				Serial.println(F("ArduRF24: Send finished"));
-
-				gtTXState = BTN_PRESS_TX_ST;
-			}
-		}
-		break;
+		return;
 	}
 }
 
@@ -108,6 +88,10 @@ void RX_FSM()
 
 	if(gNRF24.available(&byPipe))
 	{
+		Serial.print(DEBUG_STR);
+		Serial.print("Received data on ");
+		Serial.println(byPipe);
+
 		if(1 != byPipe)
 		{
 			return;
@@ -117,8 +101,12 @@ void RX_FSM()
 
 		if(gbyTOGGLE == byToggle)
 		{
-			gbBlink = true;
+			gtBlink = FAST_BLINK;
+
+			return;
 		}
+
+		gtBlink = SLOW_BLINK;
 	}
 }
 
@@ -128,52 +116,69 @@ void ActiveBlink()
 	{
 		case INIT_BLINK_ST:
 		{
-			if(gbBlink)
+			if(NO_BLINK != gtBlink)
 			{
-				ulActiveBlinkOldTime = millis();
+				gulBaseOldTime = gulStopBlinkOldTime = gulMillis;
+				gbOutState = true;
 
-				gtBlinkState = DELAY_BLINK_ST;
+				switch(gtBlink)
+				{
+					case SLOW_BLINK:
+					{
+						giBlinkCnt = giMaxBlinkCnt = SLOW_BLINK_CNT;
+					}
+					break;
+					case FAST_BLINK:
+					{
+						giBlinkCnt = giMaxBlinkCnt = FAST_BLINK_CNT;
+					}
+					break;
+				}
+
+				gtBlink = NO_BLINK;
+
+				digitalWrite(OUT_PIN, HIGH);
+
+				gtBlinkState = BLINK_ST;
 			}
 		}
 		break;
-		case DELAY_BLINK_ST:
+		case BLINK_ST:
 		{
-			if((millis() - ulActiveBlinkOldTime) > DELAY_BLINK_MS)
+			if((gulMillis - gulBaseOldTime) > BLINK_BASE_TIMER_MS)
 			{
-				gbBlink = false;
+				gulBaseOldTime = gulMillis;
 
-				gtBlinkState = DELAY_BLINK_ST;
+				// Serial.println(giBlinkCnt);
+
+				if(giBlinkCnt > 0)
+				{
+					--giBlinkCnt;
+				}
+				else
+				{
+					giBlinkCnt = giMaxBlinkCnt;
+					gbOutState = (gbOutState ? false : true);
+
+					if(gbOutState)
+					{
+						digitalWrite(OUT_PIN, HIGH);
+					}
+					else
+					{
+						digitalWrite(OUT_PIN, LOW);
+					}
+				}
+			}
+
+			if((gulMillis - gulStopBlinkOldTime) > BLINK_TOUT_MS)
+			{
+				digitalWrite(OUT_PIN, LOW);
+
+				gtBlinkState = INIT_BLINK_ST;
 			}
 		}
 		break;
-	}
-}
-
-void BlinkLed()
-{
-	if((millis() - ulBlinkOldTime) > OUT_BLINK_TIME_MS)
-	{
-		ulBlinkOldTime = millis();
-		if(gbBlink)
-		{
-			gbOutState = gbOutState ? false : true;
-
-			Serial.print(F("ArduRF24: "));
-			Serial.println(gbOutState);
-
-			if(gbOutState)
-			{
-				digitalWrite((int)OUT_PIN, HIGH);
-
-				return;
-			}
-
-			digitalWrite((int)OUT_PIN, LOW);
-
-			return;
-		}
-
-		digitalWrite((int)OUT_PIN, LOW);
 	}
 }
 
@@ -182,16 +187,13 @@ void setup()
 	/* add setup code here */
 	printf_begin();
 	Serial.begin(115200);
-
 	pinMode(TX_RX_PIN, INPUT_PULLUP);
-	// pinMode(BTN_PIN, INPUT);
 
 	delay(100);
 
 	gNRF24.begin();
 	gNRF24.enableAckPayload();
 	gNRF24.enableDynamicPayloads();
-
 	gbRadioType = digitalRead(TX_RX_PIN);
 
 	if(gbRadioType)
@@ -203,25 +205,38 @@ void setup()
 	{
 		gNRF24.openWritingPipe(grgcAddress[0]);
 		gNRF24.openReadingPipe(1, grgcAddress[1]);
-
+		gNRF24.startListening();
 		pinMode(OUT_PIN, OUTPUT);
+
+		delay(100);
+
 		digitalWrite(OUT_PIN, false);
 	}
 
 	gNRF24.startListening();
-	// gNRF24.writeAckPayload(1, &gbyCounter, 1);
-
-	delay(100);
-
 	gNRF24.printDetails();
-	Serial.println(F("ArduRF24: Setup finished"));
 
-	ulBlinkOldTime = millis();
+	Serial.print(DEBUG_STR);
+	Serial.print(F("Mode: "));
+	if(gbRadioType)
+	{
+		Serial.println(F("TX"));
+	}
+	else
+	{
+		Serial.println(F("RX"));
+	}
+
+	Serial.print(DEBUG_STR);
+	Serial.println(F("Setup finished"));
+
+	gulBaseOldTime = millis();
 }
 
 void loop()
 {
 	/* add main program code here */
+	gulMillis = millis();
 	gtBtn.read();
 
 	if(gbRadioType)
@@ -234,5 +249,4 @@ void loop()
 	}
 
 	ActiveBlink();
-	BlinkLed();
 }
